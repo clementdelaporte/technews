@@ -83,7 +83,7 @@ def render(its):
     uniq = lambda k: sorted({i[k] for i in its if i[k]}, key=str.lower)
     form = ('<form id="f" role="search"><label>Recherche<input type="search" name="q"></label>'
             '<label>Catégorie<select name="cat"><option value="">Toutes</option><option value="cloud">Cloud</option><option value="autre">Hors cloud</option></select></label>'
-            + select("sev", "Sévérité", uniq("sev")) + select("eco", "Écosystème", uniq("eco")) + select("vendor", "Vendeur", uniq("vendor")) +
+            + select("sev", "Sévérité", uniq("sev")) + select("eco", "Écosystème", uniq("eco")) + select("vendor", "Éditeur", uniq("vendor")) +
             '<label>Période<select name="days"><option value="">Tout</option><option value="7">7 jours</option><option value="30">30 jours</option><option value="365">1 an</option></select></label>'
             '<label><span>Rançongiciel</span><input type="checkbox" name="ransom" value="1"></label></form>')
     (OUT / "index.html").write_text(PAGE.format(title="TechNews", home="index.html", body=
