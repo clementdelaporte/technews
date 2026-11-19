@@ -13,7 +13,7 @@ CLOUD_PRODUCT = re.compile(r"\b(azure|aws|kubernetes|openshift|vcenter|esxi|clou
 CLOUD_PKG_TOKENS = {"aws", "amazon", "amazonaws", "azure", "k8s", "kubernetes", "docker", "moby", "containerd", "helm", "terraform", "hashicorp", "istio", "openstack", "gcp", "cloud"}
 
 def get(url):
-    req = urllib.request.Request(url, headers={"User-Agent": "cybercloud-news-builder"})
+    req = urllib.request.Request(url, headers={"User-Agent": "technews-builder"})
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.load(r)
 
@@ -54,7 +54,7 @@ input[type=checkbox]{{width:1.25rem;height:1.25rem;accent-color:#000}}
 li{{border:1px solid #000;border-radius:1rem;padding:.75rem 1rem}}li[hidden]{{display:none}}
 li a{{color:#000;font-weight:600;text-decoration:none}}li a:hover{{text-decoration:underline}}a{{color:#000}}
 small{{color:#555}}pre{{white-space:pre-wrap;font:inherit;border:1px solid #000;border-radius:1rem;padding:1rem;margin-top:1.5rem}}
-</style><header><a href="{home}">CYBER &amp; CLOUD NEWS</a></header><main>{body}</main></html>"""
+</style><header><a href="{home}">TECHNEWS</a></header><main>{body}</main></html>"""
 
 # Filtre côté client sur les data-* de chaque <li>; l'état vit dans le hash pour qu'une vue filtrée soit partageable.
 SCRIPT = """<script>
@@ -86,7 +86,7 @@ def render(its):
             + select("sev", "Sévérité", uniq("sev")) + select("eco", "Écosystème", uniq("eco")) + select("vendor", "Vendeur", uniq("vendor")) +
             '<label>Période<select name="days"><option value="">Tout</option><option value="7">7 jours</option><option value="30">30 jours</option><option value="365">1 an</option></select></label>'
             '<label><span>Rançongiciel</span><input type="checkbox" name="ransom" value="1"></label></form>')
-    (OUT / "index.html").write_text(PAGE.format(title="Cyber & Cloud News", home="index.html", body=
+    (OUT / "index.html").write_text(PAGE.format(title="TechNews", home="index.html", body=
         f'<h1>Dernières vulnérabilités</h1>{form}<p id="n" aria-live="polite"></p><ul id="l">{rows}</ul>{SCRIPT}'))
 
 if __name__ == "__main__":
