@@ -1,5 +1,6 @@
 """Génère un site statique cyber/cloud sans aucun lien sortant. Sources: CISA KEV (domaine public), GitHub Advisory DB (CC-BY 4.0)."""
 import json, re, urllib.request
+from datetime import date, timedelta
 from html import escape
 from pathlib import Path
 
@@ -54,7 +55,10 @@ input[type=checkbox]{{width:1.25rem;height:1.25rem;accent-color:#000}}
 li{{border:1px solid #000;border-radius:1rem;padding:.75rem 1rem}}li[hidden]{{display:none}}
 li a{{color:#000;font-weight:600;text-decoration:none}}li a:hover{{text-decoration:underline}}a{{color:#000}}
 small{{color:#555}}pre{{white-space:pre-wrap;font:inherit;border:1px solid #000;border-radius:1rem;padding:1rem;margin-top:1.5rem}}
-</style><header><a href="{home}">TECHNEWS</a></header><main>{body}</main></html>"""
+header{{display:flex;flex-wrap:wrap;justify-content:space-between;gap:.5rem 1.5rem}}nav{{display:flex;gap:1rem}}nav a{{font-weight:400!important}}
+h2{{font-size:1.15rem;margin:2rem 0 .75rem}}.tiles{{display:grid;grid-template-columns:repeat(auto-fill,minmax(10rem,1fr));gap:.75rem}}
+.tile{{display:block;border:2px solid #000;border-radius:1rem;padding:1rem;text-decoration:none}}.tile:hover{{background:#f2f2f2}}.tile b{{display:block;font-size:2.25rem;line-height:1}}
+</style><header><a href="{root}index.html">TECHNEWS</a><nav><a href="{root}index.html">Tableau de bord</a><a href="{root}liste.html">Toutes les failles</a></nav></header><main>{body}</main></html>"""
 
 # Filtre côté client sur les data-* de chaque <li>; l'état vit dans le hash pour qu'une vue filtrée soit partageable.
 SCRIPT = """<script>
@@ -72,11 +76,32 @@ def select(name, label, values):
     opts = "".join(f'<option value="{escape(v)}">{escape(v)}</option>' for v in values)
     return f'<label>{label}<select name="{name}"><option value="">Tous</option>{opts}</select></label>'
 
-def render(its):
+def why(i):
+    return ("Utilisée par des rançongiciels" if i["ransom"] else "Activement exploitée par des attaquants" if i["sev"] == "exploitée"
+            else "Sévérité critique" if i["sev"] == "critical" else f'Sévérité {i["sev"]}')
+
+def dashboard(its, today):
+    since = lambda days: [i for i in its if i["date"] >= (today - timedelta(days=days)).isoformat()]
+    week = since(7)
+    tiles = [("Failles exploitées", "sev=exploitée", lambda i: i["sev"] == "exploitée"),
+             ("Liées à des rançongiciels", "ransom=1", lambda i: i["ransom"]),
+             ("Failles critiques", "sev=critical", lambda i: i["sev"] == "critical"),
+             ("Touchent le cloud", "cat=cloud", lambda i: i["cloud"])]
+    cards = "".join(f'<a class="tile" href="liste.html#days=7&{q}"><b>{sum(map(f, week))}</b>{label}</a>' for label, q, f in tiles)
+    # Importance : rançongiciel > exploitée > critique, puis la plus récente.
+    top = sorted(since(30), key=lambda i: (i["ransom"], i["sev"] == "exploitée", i["sev"] == "critical", i["date"]), reverse=True)[:5]
+    rows = "".join(f'<li><a href="a/{i["id"]}.html">{escape(i["title"])}</a><br><small>{i["date"]} · {why(i)}{" · cloud" if i["cloud"] else ""}</small></li>' for i in top)
+    return (f'<h1>Tableau de bord</h1><p>Les nouvelles failles de sécurité à connaître, mises à jour plusieurs fois par jour. Données au {today:%d/%m/%Y}.</p>'
+            f'<h2>Ces 7 derniers jours</h2><div class="tiles">{cards}</div>'
+            f'<h2>Les 5 failles les plus importantes du mois</h2>' + (f'<ul>{rows}</ul>' if rows else '<p>Aucune nouvelle faille ce mois-ci.</p>') +
+            '<p><a href="liste.html">Voir toutes les failles →</a></p>')
+
+def render(its, today=None):
+    today = today or date.today()
     OUT.mkdir(exist_ok=True); (OUT / "a").mkdir(exist_ok=True)  # liens internes uniquement
     for i in its:
         tags = " · ".join(t for t in ("cloud" if i["cloud"] else "", i["sev"], "rançongiciel" if i["ransom"] else "", i["eco"], i["vendor"]) if t)
-        (OUT / "a" / f'{i["id"]}.html').write_text(PAGE.format(title=escape(i["title"]), home="../index.html", body=
+        (OUT / "a" / f'{i["id"]}.html').write_text(PAGE.format(title=escape(i["title"]), root="../", body=
             f'<p><a href="../index.html">← Accueil</a></p><h1>{escape(i["title"])}</h1><small>{i["date"]} · {escape(tags)} · Source : {escape(i["source"])}</small><pre>{escape(i["body"])}</pre>'))
     rows = "".join(f'<li data-cat="{"cloud" if i["cloud"] else "autre"}" data-sev="{escape(i["sev"])}" data-ransom="{int(i["ransom"])}" data-eco="{escape(i["eco"])}" data-vendor="{escape(i["vendor"])}" data-date="{i["date"]}">'
                    f'<a href="a/{i["id"]}.html">{escape(i["title"])}</a><br><small>{i["date"]}{" · cloud" if i["cloud"] else ""}{" · rançongiciel" if i["ransom"] else ""}</small></li>' for i in its)
@@ -86,8 +111,9 @@ def render(its):
             + select("sev", "Sévérité", uniq("sev")) + select("eco", "Écosystème", uniq("eco")) + select("vendor", "Éditeur", uniq("vendor")) +
             '<label>Période<select name="days"><option value="">Tout</option><option value="7">7 jours</option><option value="30">30 jours</option><option value="365">1 an</option></select></label>'
             '<label><span>Rançongiciel</span><input type="checkbox" name="ransom" value="1"></label></form>')
-    (OUT / "index.html").write_text(PAGE.format(title="TechNews", home="index.html", body=
-        f'<h1>Dernières vulnérabilités</h1>{form}<p id="n" aria-live="polite"></p><ul id="l">{rows}</ul>{SCRIPT}'))
+    (OUT / "index.html").write_text(PAGE.format(title="TechNews", root="", body=dashboard(its, today)))
+    (OUT / "liste.html").write_text(PAGE.format(title="Toutes les failles · TechNews", root="", body=
+        f'<h1>Toutes les failles</h1>{form}<p id="n" aria-live="polite"></p><ul id="l">{rows}</ul>{SCRIPT}'))
 
 if __name__ == "__main__":
     render(items(get(KEV), get(GHSA)))
