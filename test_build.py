@@ -33,6 +33,9 @@ cve_html = (build.OUT / "a/CVE-1.html").read_text()
 assert 'class="callout"' in cve_html and 'href="../liste.html"' in cve_html
 assert 'href="https://nvd.nist.gov/vuln/detail/CVE-1"' in cve_html and 'rel="noopener noreferrer"' in cve_html
 assert 'href="https://github.com/advisories/GHSA-a"' in (build.OUT / "a/GHSA-a.html").read_text()
+assert '<use href="#i-vmware"/>' in cve_html and '<use href="#i-npm"/>' in idx
+assert 'class="tech-head"' in idx and 'width:2.25rem;height:2.25rem' in dash
+assert 'class="ico-m"' in build.tech_title(dict(id="X", tech="Zabbix", vendor="Zabbix", eco="", summary="bug"))
 md_out = build.md_html("## Impact\n\n- `foo` **bar**\n\n```\n<script>\n```")
 assert "<h2>Impact</h2>" in md_out and "<code>foo</code>" in md_out and "<strong>bar</strong>" in md_out and "&lt;script&gt;" in md_out
 print("ok")

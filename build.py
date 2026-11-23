@@ -25,20 +25,31 @@ def pkg_cloud(name):
     toks = re.split(r"[^a-z0-9]+", name.lower())
     return any(t in CLOUD_PKG_TOKENS or t.startswith("kube") or t.endswith("kube") for t in toks)
 
+def _split_tech(tech, text):
+    rest = text[len(tech):].lstrip(" :-") if text.lower().startswith(tech.lower()) and len(text) > len(tech) + 3 else text
+    return tech, rest or text
+
 def items(kev, ghsa):
     out = []
     for v in kev["vulnerabilities"]:
-        out.append(dict(id=v["cveID"], date=v["dateAdded"], title=f'{v["vendorProject"]} {v["product"]} : {v["vulnerabilityName"]}',
+        vendor, prod = v["vendorProject"], v["product"]
+        tech_raw = prod if vendor.lower() in prod.lower() else f"{vendor} {prod}".strip()
+        tech, summary = _split_tech(tech_raw, v["vulnerabilityName"])
+        out.append(dict(id=v["cveID"], date=v["dateAdded"], tech=tech, summary=summary, title=f"{tech} : {summary}",
             body=f'{v["shortDescription"]}\n\nAction requise : {v["requiredAction"]}\n\nUtilisée par des rançongiciels : {v["knownRansomwareCampaignUse"]}',
             source="CISA KEV (domaine public)", url=f'https://nvd.nist.gov/vuln/detail/{v["cveID"]}', cloud=kev_cloud(v), sev="exploitée",
-            ransom=v["knownRansomwareCampaignUse"] == "Known", eco="", vendor=v["vendorProject"]))
+            ransom=v["knownRansomwareCampaignUse"] == "Known", eco="", vendor=vendor))
     for a in ghsa:
         pkgs = [p["package"] for p in a.get("vulnerabilities") or [] if p.get("package")]
-        out.append(dict(id=a["ghsa_id"], date=a["published_at"][:10], title=a["summary"],
+        eco = pkgs[0]["ecosystem"] if pkgs else ""
+        tech_raw = (pkgs[0]["name"] if pkgs else eco) or "GitHub"
+        tech, summary = _split_tech(tech_raw, a["summary"])
+        out.append(dict(id=a["ghsa_id"], date=a["published_at"][:10], tech=tech, summary=summary,
+            title=f"{tech} : {summary}" if tech != summary else tech,
             body=(a.get("description") or "")[:3000], source="GitHub Advisory Database (CC-BY 4.0)",
             url=a.get("html_url") or f'https://github.com/advisories/{a["ghsa_id"]}',
             cloud=any(pkg_cloud(p["name"]) for p in pkgs), sev=a["severity"], ransom=False,
-            eco=pkgs[0]["ecosystem"] if pkgs else "", vendor=""))
+            eco=eco, vendor=""))
     return sorted(out, key=lambda i: i["date"], reverse=True)
 
 PAGE = """<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -95,8 +106,15 @@ li a:hover{{text-decoration:underline}}
 .doc pre{{background:var(--code);border:1px solid var(--line);padding:.85rem;overflow-x:auto}}
 .doc pre code{{background:none;padding:0}}
 .callout{{border-left:3px solid var(--crit);background:var(--crit-bg);padding:.75rem 1rem;margin:.85rem 0}}
+.tech-head{{display:flex;align-items:center;gap:.6rem;margin-bottom:.45rem;font-size:.98rem;font-weight:700;color:var(--ink)}}
+.card-link{{display:block;text-decoration:none}}
+.card-link:hover .card-title{{text-decoration:underline}}
+.card-title{{font-weight:600}}
+.ico,.ico-m{{width:2.25rem;height:2.25rem;flex:0 0 2.25rem;display:inline-flex;align-items:center;justify-content:center}}
+.ico-m{{font-size:.95rem;font-weight:800;color:#fff;letter-spacing:-.02em}}
 #more{{margin-top:1rem;width:100%;height:2.6rem}}
-</style><header><div class="wrap"><a class="brand" href="{root}index.html">TECHNEWS</a><nav><a href="{root}index.html"{nav_dash}>Tableau de bord</a><a href="{root}liste.html"{nav_list}>Toutes les failles</a></nav></div></header><main>{body}</main></html>"""
+svg[hidden]{{display:none}}
+</style><header><div class="wrap"><a class="brand" href="{root}index.html">TECHNEWS</a><nav><a href="{root}index.html"{nav_dash}>Tableau de bord</a><a href="{root}liste.html"{nav_list}>Toutes les failles</a></nav></div></header><main>{body}</main>{icons}</html>"""
 
 # Filtre côté client sur les data-* de chaque <li>; l'état vit dans le hash pour qu'une vue filtrée soit partageable.
 SCRIPT = """<script>
@@ -114,6 +132,54 @@ document.getElementById('rst').addEventListener('click',()=>{F.reset();lim=50;ru
 M.addEventListener('click',()=>{lim+=50;run()});
 run();
 </script>"""
+
+ICONS = json.loads((Path(__file__).parent / "icons.json").read_text()) if (Path(__file__).parent / "icons.json").exists() else {}
+ICON_ALIAS = {"pip": "pypi", "maven": "apachemaven", "next": "nextdotjs", "chrome": "googlechrome", "chromium": "googlechrome",
+              "juniper": "junipernetworks", "palo alto": "paloaltonetworks", "red hat": "redhat", "trend micro": "trendmicro",
+              "tp-link": "tplink", "7-zip": "7zip", "notepad++": "notepadplusplus", "vmware": "vmware", "kubernetes": "kubernetes", "k8s": "kubernetes"}
+MONO_PALETTE = ("#1e3a8a", "#0f766e", "#7c2d12", "#4c1d95", "#065f46", "#831843", "#374151", "#9a3412")
+
+def _slug(s):
+    return re.sub(r"[^a-z0-9]", "", s.lower().replace("+", "plus").replace(".", "dot").replace("&", "and"))
+
+def _icon_color(hx):
+    r, g, b = int(hx[:2], 16), int(hx[2:4], 16), int(hx[4:6], 16)
+    return "currentColor" if (r * 299 + g * 587 + b * 114) // 1000 < 80 else f"#{hx}"
+
+def _tech_slug(i):
+    hay = f'{i["tech"]} {i["vendor"]} {i["eco"]}'.lower()
+    for cand in (i["tech"], i["tech"].split()[0] if i["tech"] else "", i["vendor"], i["eco"]):
+        s = _slug(cand)
+        if s in ICONS:
+            return s
+    for k, target in ICON_ALIAS.items():
+        if target in ICONS and re.search(rf"\b{re.escape(k)}\b", hay):
+            return target
+    for w in re.findall(r"[a-z0-9]{3,}", hay):
+        if w in ICONS:
+            return w
+    return ""
+
+def icon_sprite(html):
+    used = sorted(set(re.findall(r'href="#i-([a-z0-9]+)"', html)))
+    if not used:
+        return ""
+    syms = "".join(f'<symbol id="i-{s}" viewBox="0 0 24 24"><path fill="{_icon_color(ICONS[s][0])}" d="{ICONS[s][1]}"/></symbol>' for s in used if s in ICONS)
+    return f'<svg hidden aria-hidden="true" style="display:none">{syms}</svg>'
+
+def tech_icon(i):
+    sym = _tech_slug(i)
+    if sym:
+        return f'<svg class="ico" aria-hidden="true"><use href="#i-{sym}"/></svg>'
+    words = re.findall(r"[A-Za-z0-9]+", i["tech"])
+    abbr = ((words[0][0] + words[1][0]) if len(words) > 1 else (words[0][:2] if words else "??")).upper()
+    bg = MONO_PALETTE[sum(map(ord, i["tech"])) % len(MONO_PALETTE)]
+    return f'<span class="ico-m" style="background:{bg}" aria-hidden="true">{escape(abbr)}</span>'
+
+def tech_title(i, linked=True):
+    head = f'<div class="tech-head">{tech_icon(i)}<span>{escape(i["tech"])}</span></div>'
+    rest = escape(i["summary"]) if i["summary"] and i["summary"] != i["tech"] else escape(i["id"])
+    return f'<a class="card-link" href="a/{i["id"]}.html">{head}<div class="card-title">{rest}</div></a>' if linked else f'{head}<h1>{rest}</h1>'
 
 def select(name, label, values):
     opts = "".join(f'<option value="{escape(v)}">{escape(v)}</option>' for v in values)
@@ -169,7 +235,7 @@ def dashboard(its, today):
     cards = "".join(f'<a class="tile{cls}" href="liste.html#days=7&{q}"><b>{sum(map(f, week))}</b>{label}</a>' for label, q, f, cls in tiles)
     # Importance : rançongiciel > exploitée > critique, puis la plus récente.
     top = sorted(since(30), key=lambda i: (i["ransom"], i["sev"] == "exploitée", i["sev"] == "critical", i["date"]), reverse=True)[:5]
-    rows = "".join(f'<li><a href="a/{i["id"]}.html">{escape(i["title"])}</a><div class="tags"><span>{i["date"]}</span>{badges(i)}<span>{why(i)}</span></div></li>' for i in top)
+    rows = "".join(f'<li>{tech_title(i)}<div class="tags"><span>{i["date"]}</span>{badges(i)}<span>{why(i)}</span></div></li>' for i in top)
     return (f'<h1>Tableau de bord</h1><p>Les nouvelles failles de sécurité à connaître, mises à jour plusieurs fois par jour. Données au {today:%d/%m/%Y}.</p>'
             f'<h2>Ces 7 derniers jours</h2><div class="tiles">{cards}</div>'
             f'<h2>Les 5 failles les plus importantes du mois</h2>' + (f'<ul>{rows}</ul>' if rows else '<p>Aucune nouvelle faille ce mois-ci.</p>') +
@@ -180,13 +246,12 @@ def render(its, today=None):
     OUT.mkdir(exist_ok=True); (OUT / "a").mkdir(exist_ok=True)  # liens internes uniquement
     for i in its:
         src_link = f'<a href="{escape(i["url"])}" rel="noopener noreferrer" target="_blank">{escape(i["source"])} ↗</a>'
-        (OUT / "a" / f'{i["id"]}.html').write_text(PAGE.format(title=escape(i["title"]), root="../", nav_dash="", nav_list="", body=
-            f'<p class="back"><a href="../index.html">← Tableau de bord</a> · <a href="../liste.html">Toutes les failles</a></p>'
-            f'<h1>{escape(i["title"])}</h1>'
-            f'<div class="tags"><span>{i["date"]}</span>{badges(i)}<span>Source : {src_link}</span></div>'
-            f'<article class="doc">{md_html(i["body"])}</article>'))
+        detail = (f'<p class="back"><a href="../index.html">← Tableau de bord</a> · <a href="../liste.html">Toutes les failles</a></p>'
+                  f'{tech_title(i, linked=False)}<div class="tags"><span>{i["date"]}</span>{badges(i)}<span>Source : {src_link}</span></div>'
+                  f'<article class="doc">{md_html(i["body"])}</article>')
+        (OUT / "a" / f'{i["id"]}.html').write_text(PAGE.format(title=escape(i["title"]), root="../", nav_dash="", nav_list="", icons=icon_sprite(detail), body=detail))
     rows = "".join(f'<li data-cat="{"cloud" if i["cloud"] else "autre"}" data-sev="{escape(i["sev"])}" data-ransom="{int(i["ransom"])}" data-eco="{escape(i["eco"])}" data-vendor="{escape(i["vendor"])}" data-date="{i["date"]}">'
-                   f'<a href="a/{i["id"]}.html">{escape(i["title"])}</a><div class="tags"><span>{i["date"]}</span>{badges(i)}</div></li>' for i in its)
+                   f'{tech_title(i)}<div class="tags"><span>{i["date"]}</span>{badges(i)}</div></li>' for i in its)
     uniq = lambda k: sorted({i[k] for i in its if i[k]}, key=str.lower)
     form = ('<form id="f" role="search"><label>Recherche<input type="search" name="q" placeholder="CVE, produit, mot-clé…"></label>'
             '<label>Catégorie<select name="cat"><option value="">Toutes</option><option value="cloud">Cloud</option><option value="autre">Hors cloud</option></select></label>'
@@ -194,9 +259,10 @@ def render(its, today=None):
             '<label>Période<select name="days"><option value="">Tout</option><option value="7">7 jours</option><option value="30">30 jours</option><option value="365">1 an</option></select></label>'
             '<label class="chk"><input type="checkbox" name="ransom" value="1">Rançongiciel</label>'
             '<button type="button" id="rst">Réinitialiser</button></form>')
-    (OUT / "index.html").write_text(PAGE.format(title="TechNews", root="", nav_dash=' aria-current="page"', nav_list="", body=dashboard(its, today)))
-    (OUT / "liste.html").write_text(PAGE.format(title="Toutes les failles · TechNews", root="", nav_dash="", nav_list=' aria-current="page"', body=
-        f'<h1>Toutes les failles</h1>{form}<p id="n" aria-live="polite"></p><ul id="l">{rows}</ul><button id="more" type="button" hidden></button>{SCRIPT}'))
+    dash_body = dashboard(its, today)
+    list_body = f'<h1>Toutes les failles</h1>{form}<p id="n" aria-live="polite"></p><ul id="l">{rows}</ul><button id="more" type="button" hidden></button>{SCRIPT}'
+    (OUT / "index.html").write_text(PAGE.format(title="TechNews", root="", nav_dash=' aria-current="page"', nav_list="", icons=icon_sprite(dash_body), body=dash_body))
+    (OUT / "liste.html").write_text(PAGE.format(title="Toutes les failles · TechNews", root="", nav_dash="", nav_list=' aria-current="page"', icons=icon_sprite(list_body), body=list_body))
 
 if __name__ == "__main__":
     render(items(get(KEV), get(GHSA)))
