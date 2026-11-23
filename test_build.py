@@ -28,4 +28,9 @@ assert top.count("<li>") == 5 and "CVE-1" in top.split("</li>")[0] and "rançong
 assert "Aucune nouvelle faille" in build.dashboard(list(its.values()), date(2027, 1, 1))
 assert "&lt;b&gt;" in (build.OUT / "a/CVE-1.html").read_text() and "http" not in idx
 assert 'data-cat="cloud" data-sev="exploitée" data-ransom="1"' in idx and '<option value="npm">' in idx
+assert 'border-radius:0' in dash and 'aria-current="page"' in dash and 'id="rst"' in idx and 'id="more"' in idx
+cve_html = (build.OUT / "a/CVE-1.html").read_text()
+assert 'class="callout"' in cve_html and 'href="../liste.html"' in cve_html
+md_out = build.md_html("## Impact\n\n- `foo` **bar**\n\n```\n<script>\n```")
+assert "<h2>Impact</h2>" in md_out and "<code>foo</code>" in md_out and "<strong>bar</strong>" in md_out and "&lt;script&gt;" in md_out
 print("ok")
