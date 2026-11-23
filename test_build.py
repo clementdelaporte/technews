@@ -31,6 +31,8 @@ assert 'data-cat="cloud" data-sev="exploitée" data-ransom="1"' in idx and '<opt
 assert 'border-radius:0' in dash and 'aria-current="page"' in dash and 'id="rst"' in idx and 'id="more"' in idx
 cve_html = (build.OUT / "a/CVE-1.html").read_text()
 assert 'class="callout"' in cve_html and 'href="../liste.html"' in cve_html
+assert 'href="https://nvd.nist.gov/vuln/detail/CVE-1"' in cve_html and 'rel="noopener noreferrer"' in cve_html
+assert 'href="https://github.com/advisories/GHSA-a"' in (build.OUT / "a/GHSA-a.html").read_text()
 md_out = build.md_html("## Impact\n\n- `foo` **bar**\n\n```\n<script>\n```")
 assert "<h2>Impact</h2>" in md_out and "<code>foo</code>" in md_out and "<strong>bar</strong>" in md_out and "&lt;script&gt;" in md_out
 print("ok")

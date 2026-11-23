@@ -1,4 +1,4 @@
-"""Génère un site statique cyber/cloud sans aucun lien sortant. Sources: CISA KEV (domaine public), GitHub Advisory DB (CC-BY 4.0)."""
+"""Génère un site statique cyber/cloud. Sources: CISA KEV (domaine public), GitHub Advisory DB (CC-BY 4.0)."""
 import json, re, urllib.request
 from datetime import date, timedelta
 from html import escape
@@ -30,12 +30,13 @@ def items(kev, ghsa):
     for v in kev["vulnerabilities"]:
         out.append(dict(id=v["cveID"], date=v["dateAdded"], title=f'{v["vendorProject"]} {v["product"]} : {v["vulnerabilityName"]}',
             body=f'{v["shortDescription"]}\n\nAction requise : {v["requiredAction"]}\n\nUtilisée par des rançongiciels : {v["knownRansomwareCampaignUse"]}',
-            source="CISA KEV (domaine public)", cloud=kev_cloud(v), sev="exploitée",
+            source="CISA KEV (domaine public)", url=f'https://nvd.nist.gov/vuln/detail/{v["cveID"]}', cloud=kev_cloud(v), sev="exploitée",
             ransom=v["knownRansomwareCampaignUse"] == "Known", eco="", vendor=v["vendorProject"]))
     for a in ghsa:
         pkgs = [p["package"] for p in a.get("vulnerabilities") or [] if p.get("package")]
         out.append(dict(id=a["ghsa_id"], date=a["published_at"][:10], title=a["summary"],
             body=(a.get("description") or "")[:3000], source="GitHub Advisory Database (CC-BY 4.0)",
+            url=a.get("html_url") or f'https://github.com/advisories/{a["ghsa_id"]}',
             cloud=any(pkg_cloud(p["name"]) for p in pkgs), sev=a["severity"], ransom=False,
             eco=pkgs[0]["ecosystem"] if pkgs else "", vendor=""))
     return sorted(out, key=lambda i: i["date"], reverse=True)
@@ -178,10 +179,11 @@ def render(its, today=None):
     today = today or date.today()
     OUT.mkdir(exist_ok=True); (OUT / "a").mkdir(exist_ok=True)  # liens internes uniquement
     for i in its:
+        src_link = f'<a href="{escape(i["url"])}" rel="noopener noreferrer" target="_blank">{escape(i["source"])} ↗</a>'
         (OUT / "a" / f'{i["id"]}.html').write_text(PAGE.format(title=escape(i["title"]), root="../", nav_dash="", nav_list="", body=
             f'<p class="back"><a href="../index.html">← Tableau de bord</a> · <a href="../liste.html">Toutes les failles</a></p>'
             f'<h1>{escape(i["title"])}</h1>'
-            f'<div class="tags"><span>{i["date"]}</span>{badges(i)}<span>Source : {escape(i["source"])}</span></div>'
+            f'<div class="tags"><span>{i["date"]}</span>{badges(i)}<span>Source : {src_link}</span></div>'
             f'<article class="doc">{md_html(i["body"])}</article>'))
     rows = "".join(f'<li data-cat="{"cloud" if i["cloud"] else "autre"}" data-sev="{escape(i["sev"])}" data-ransom="{int(i["ransom"])}" data-eco="{escape(i["eco"])}" data-vendor="{escape(i["vendor"])}" data-date="{i["date"]}">'
                    f'<a href="a/{i["id"]}.html">{escape(i["title"])}</a><div class="tags"><span>{i["date"]}</span>{badges(i)}</div></li>' for i in its)
