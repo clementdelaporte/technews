@@ -91,6 +91,7 @@ button:hover{{background:var(--strong);color:var(--card)}}
 .tech-list{{display:grid;grid-template-columns:repeat(auto-fill,minmax(11rem,1fr));gap:.25rem .75rem;max-height:14rem;overflow-y:auto;padding:.25rem 0}}
 .tech-list label.chk{{height:auto;padding:.2rem 0;font-size:.88rem;font-weight:500;text-transform:none;letter-spacing:0}}
 .tech-list label.chk[hidden],.tech-grp[hidden]{{display:none}}
+.tech-note{{margin:.65rem 0 0;font-size:.82rem;color:var(--muted)}}
 :focus-visible{{outline:2px solid var(--strong);outline-offset:2px}}
 #n{{font-weight:700;margin:1rem 0 .5rem}}
 ul{{list-style:none;padding:0;margin:0;display:grid;gap:.5rem}}
@@ -133,7 +134,7 @@ svg[hidden]{{display:none}}
 # Filtre côté client sur les data-* de chaque <li>; filtres dans le hash (partageable) et technos préférées dans un cookie.
 SCRIPT = """<script>
 const F=document.getElementById('f'),L=[...document.querySelectorAll('#l li')],N=document.getElementById('n'),M=document.getElementById('more');
-const TB=document.getElementById('techs'),TC=document.getElementById('tc'),TQ=document.getElementById('tq'),TBS=TB?[...TB.querySelectorAll('input[type=checkbox]')]:[];
+const TB=document.getElementById('techs'),TC=document.getElementById('tc'),TCK=document.getElementById('tck'),TQ=document.getElementById('tq'),TBS=TB?[...TB.querySelectorAll('input[type=checkbox]')]:[];
 const CK='technews_techs',SEC=location.protocol.endsWith('s:')?'; Secure':'';
 let lim=50;
 function readTechs(){const m=document.cookie.match(/(?:^|; )technews_techs=([^;]*)/);if(!m)return new Set();try{return new Set(decodeURIComponent(m[1]).split('\\n').filter(Boolean))}catch{return new Set()}}
@@ -141,7 +142,7 @@ function readTechs(){const m=document.cookie.match(/(?:^|; )technews_techs=([^;]
 function saveTechs(sel){document.cookie=sel.size?CK+'='+encodeURIComponent([...sel].join('\\n'))+'; path=/; max-age=31536000; SameSite=Lax'+SEC:CK+'=; path=/; max-age=0; SameSite=Lax'+SEC}
 function run(){const q=new FormData(F),s=new URLSearchParams();for(const[k,v]of q)if(v)s.set(k,v);history.replaceState(null,'','#'+s);
 const picked=TBS.filter(c=>c.checked),sel=new Set(picked.map(c=>c.value));
-if(TB){if(sel.size){TB.dataset.on='1';const names=picked.map(c=>c.parentNode.textContent);TC.textContent=' · '+sel.size+' sélectionnée'+(sel.size>1?'s':'')+(sel.size<=3?' ('+names.join(', ')+')':'')}else{delete TB.dataset.on;TC.textContent=''}}
+if(TB){if(sel.size){TB.dataset.on='1';const names=picked.map(c=>c.parentNode.textContent);TC.textContent=' · '+sel.size+' sélectionnée'+(sel.size>1?'s':'')+(sel.size<=3?' ('+names.join(', ')+')':'')}else{delete TB.dataset.on;TC.textContent=''}if(TCK)TCK.hidden=!sel.size}
 const t=(q.get('q')||'').toLowerCase(),d=+q.get('days'),now=Date.now();let n=0,shown=0;
 for(const l of L){const x=l.dataset,ok=(!q.get('cat')||x.cat==q.get('cat'))&&(!q.get('sev')||x.sev==q.get('sev'))&&(!q.get('ransom')||x.ransom=='1')
 &&(!q.get('eco')||x.eco==q.get('eco'))&&(!q.get('vendor')||x.vendor==q.get('vendor'))&&(!sel.size||(x.eco&&sel.has('e:'+x.eco))||(x.vendor&&sel.has('v:'+x.vendor)))
@@ -224,7 +225,8 @@ def tech_picker(ecos, vendors):
         return ""
     return (f'<details id="techs"><summary>Mes technos<span id="tc"></span></summary><div class="tech-box">'
             f'<div class="tech-bar"><input type="search" id="tq" placeholder="Filtrer les technos…" aria-label="Filtrer les technos">'
-            f'<button type="button" id="tclr">Tout décocher</button></div>{body}</div></details>')
+            f'<button type="button" id="tclr">Tout décocher</button></div>{body}'
+            f'<p id="tck" class="tech-note" hidden>Votre sélection est enregistrée dans un cookie sur ce navigateur pendant un an. Elle reste locale et disparaît si vous videz vos cookies.</p></div></details>')
 
 def why(i):
     return ("Utilisée par des rançongiciels" if i["ransom"] else "Activement exploitée par des attaquants" if i["sev"] == "exploitée"

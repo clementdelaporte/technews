@@ -38,7 +38,7 @@ assert 'class="tech-head"' in idx and 'width:2.25rem;height:2.25rem' in dash
 assert 'class="ico-m"' in build.tech_title(dict(id="X", tech="Zabbix", vendor="Zabbix", eco="", summary="bug"))
 md_out = build.md_html("## Impact\n\n- `foo` **bar**\n\n```\n<script>\n```")
 assert "<h2>Impact</h2>" in md_out and "<code>foo</code>" in md_out and "<strong>bar</strong>" in md_out and "&lt;script&gt;" in md_out
-assert 'id="techs"' in idx and 'id="tq"' in idx and 'id="tclr"' in idx and 'id="tc"' in idx
+assert 'id="techs"' in idx and 'id="tq"' in idx and 'id="tclr"' in idx and 'id="tc"' in idx and 'id="tck"' in idx
 assert 'value="e:npm"' in idx and 'value="v:VMware"' in idx and 'technews_techs' in idx and 'SameSite=Lax' in idx
 assert build.tech_picker([], []) == ""
 assert 'value="v:A &amp; &lt;B&gt;"' in build.tech_picker([], ["A & <B>"])
