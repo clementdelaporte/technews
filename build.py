@@ -74,9 +74,23 @@ form{{display:grid;grid-template-columns:repeat(auto-fill,minmax(10.5rem,1fr));g
 label{{display:flex;flex-direction:column;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}}
 input,select,button{{font:inherit;font-size:.95rem;margin-top:.25rem;padding:.45rem .6rem;border:1px solid var(--line);background:var(--bg);color:var(--ink);height:2.35rem}}
 label.chk{{flex-direction:row;align-items:center;gap:.5rem;height:2.35rem;color:var(--ink);cursor:pointer}}
-input[type=checkbox]{{width:1.15rem;height:1.15rem;margin:0;accent-color:var(--strong)}}
+input[type=checkbox]{{width:1.15rem;height:1.15rem;margin:0;flex-shrink:0;accent-color:var(--strong)}}
 button{{background:var(--card);border:1px solid var(--strong);font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;padding:0 .9rem}}
 button:hover{{background:var(--strong);color:var(--card)}}
+#techs{{margin-top:.75rem;background:var(--card);border:1px solid var(--line)}}
+#techs[data-on]{{border-color:var(--strong)}}
+#techs summary{{padding:.65rem 1rem;cursor:pointer;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em}}
+#techs summary:hover{{background:var(--hover)}}
+#tc{{font-weight:600;color:var(--muted);text-transform:none;letter-spacing:0}}
+#techs[data-on] #tc{{color:var(--ink)}}
+.tech-box{{padding:0 1rem 1rem;border-top:1px solid var(--line)}}
+.tech-bar{{display:flex;flex-wrap:wrap;gap:.5rem;margin:.75rem 0}}
+.tech-bar input{{flex:1 1 12rem;margin:0}}
+.tech-bar button{{margin:0}}
+.tech-grp h3{{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:.75rem 0 .4rem}}
+.tech-list{{display:grid;grid-template-columns:repeat(auto-fill,minmax(11rem,1fr));gap:.25rem .75rem;max-height:14rem;overflow-y:auto;padding:.25rem 0}}
+.tech-list label.chk{{height:auto;padding:.2rem 0;font-size:.88rem;font-weight:500;text-transform:none;letter-spacing:0}}
+.tech-list label.chk[hidden],.tech-grp[hidden]{{display:none}}
 :focus-visible{{outline:2px solid var(--strong);outline-offset:2px}}
 #n{{font-weight:700;margin:1rem 0 .5rem}}
 ul{{list-style:none;padding:0;margin:0;display:grid;gap:.5rem}}
@@ -116,19 +130,33 @@ li a:hover{{text-decoration:underline}}
 svg[hidden]{{display:none}}
 </style><header><div class="wrap"><a class="brand" href="{root}index.html">TECHNEWS</a><nav><a href="{root}index.html"{nav_dash}>Tableau de bord</a><a href="{root}liste.html"{nav_list}>Toutes les failles</a></nav></div></header><main>{body}</main>{icons}</html>"""
 
-# Filtre côté client sur les data-* de chaque <li>; l'état vit dans le hash pour qu'une vue filtrée soit partageable.
+# Filtre côté client sur les data-* de chaque <li>; filtres dans le hash (partageable) et technos préférées dans un cookie.
 SCRIPT = """<script>
 const F=document.getElementById('f'),L=[...document.querySelectorAll('#l li')],N=document.getElementById('n'),M=document.getElementById('more');
+const TB=document.getElementById('techs'),TC=document.getElementById('tc'),TQ=document.getElementById('tq'),TBS=TB?[...TB.querySelectorAll('input[type=checkbox]')]:[];
+const CK='technews_techs',SEC=location.protocol.endsWith('s:')?'; Secure':'';
 let lim=50;
+function readTechs(){const m=document.cookie.match(/(?:^|; )technews_techs=([^;]*)/);if(!m)return new Set();try{return new Set(decodeURIComponent(m[1]).split('\\n').filter(Boolean))}catch{return new Set()}}
+// shortcut: un seul cookie (~4 Ko max), basculer sur localStorage si besoin de >150 technos cochées simultanément
+function saveTechs(sel){document.cookie=sel.size?CK+'='+encodeURIComponent([...sel].join('\\n'))+'; path=/; max-age=31536000; SameSite=Lax'+SEC:CK+'=; path=/; max-age=0; SameSite=Lax'+SEC}
 function run(){const q=new FormData(F),s=new URLSearchParams();for(const[k,v]of q)if(v)s.set(k,v);history.replaceState(null,'','#'+s);
+const picked=TBS.filter(c=>c.checked),sel=new Set(picked.map(c=>c.value));
+if(TB){if(sel.size){TB.dataset.on='1';const names=picked.map(c=>c.parentNode.textContent);TC.textContent=' · '+sel.size+' sélectionnée'+(sel.size>1?'s':'')+(sel.size<=3?' ('+names.join(', ')+')':'')}else{delete TB.dataset.on;TC.textContent=''}}
 const t=(q.get('q')||'').toLowerCase(),d=+q.get('days'),now=Date.now();let n=0,shown=0;
 for(const l of L){const x=l.dataset,ok=(!q.get('cat')||x.cat==q.get('cat'))&&(!q.get('sev')||x.sev==q.get('sev'))&&(!q.get('ransom')||x.ransom=='1')
-&&(!q.get('eco')||x.eco==q.get('eco'))&&(!q.get('vendor')||x.vendor==q.get('vendor'))&&(!d||now-Date.parse(x.date)<d*864e5)&&(!t||l.textContent.toLowerCase().includes(t));
+&&(!q.get('eco')||x.eco==q.get('eco'))&&(!q.get('vendor')||x.vendor==q.get('vendor'))&&(!sel.size||(x.eco&&sel.has('e:'+x.eco))||(x.vendor&&sel.has('v:'+x.vendor)))
+&&(!d||now-Date.parse(x.date)<d*864e5)&&(!t||l.textContent.toLowerCase().includes(t));
 if(ok){n++;l.hidden=shown>=lim;if(shown<lim)shown++}else l.hidden=true}
 N.textContent=n+' résultat'+(n>1?'s':'');M.hidden=shown>=n;M.textContent='Afficher plus ('+(n-shown)+' restants)'}
 for(const[k,v]of new URLSearchParams(location.hash.slice(1))){const e=F.elements[k];if(e)e.type=='checkbox'?e.checked=true:e.value=v}
+const saved=readTechs();for(const c of TBS)if(saved.has(c.value))c.checked=true;
 F.addEventListener('input',()=>{lim=50;run()});
 document.getElementById('rst').addEventListener('click',()=>{F.reset();lim=50;run()});
+if(TB){
+TB.addEventListener('change',e=>{if(e.target.type!='checkbox')return;saveTechs(new Set(TBS.filter(c=>c.checked).map(c=>c.value)));lim=50;run()});
+TQ.addEventListener('input',()=>{const q=TQ.value.trim().toLowerCase();for(const g of TB.querySelectorAll('.tech-grp')){let any=false;for(const lb of g.querySelectorAll('label.chk')){const ok=!q||lb.textContent.toLowerCase().includes(q);lb.hidden=!ok;if(ok)any=true}g.hidden=!any}});
+document.getElementById('tclr').addEventListener('click',()=>{for(const c of TBS)c.checked=false;saveTechs(new Set());lim=50;run()});
+}
 M.addEventListener('click',()=>{lim+=50;run()});
 run();
 </script>"""
@@ -184,6 +212,19 @@ def tech_title(i, linked=True):
 def select(name, label, values):
     opts = "".join(f'<option value="{escape(v)}">{escape(v)}</option>' for v in values)
     return f'<label>{label}<select name="{name}"><option value="">Tous</option>{opts}</select></label>'
+
+def tech_picker(ecos, vendors):
+    grp = lambda title, pfx, vals: (
+        f'<div class="tech-grp"><h3>{title}</h3><div class="tech-list">'
+        + "".join(f'<label class="chk"><input type="checkbox" value="{pfx}:{escape(v)}">{escape(v)}</label>' for v in vals)
+        + '</div></div>'
+    ) if vals else ""
+    body = grp("Écosystèmes", "e", ecos) + grp("Éditeurs", "v", vendors)
+    if not body:
+        return ""
+    return (f'<details id="techs"><summary>Mes technos<span id="tc"></span></summary><div class="tech-box">'
+            f'<div class="tech-bar"><input type="search" id="tq" placeholder="Filtrer les technos…" aria-label="Filtrer les technos">'
+            f'<button type="button" id="tclr">Tout décocher</button></div>{body}</div></details>')
 
 def why(i):
     return ("Utilisée par des rançongiciels" if i["ransom"] else "Activement exploitée par des attaquants" if i["sev"] == "exploitée"
@@ -253,14 +294,15 @@ def render(its, today=None):
     rows = "".join(f'<li data-cat="{"cloud" if i["cloud"] else "autre"}" data-sev="{escape(i["sev"])}" data-ransom="{int(i["ransom"])}" data-eco="{escape(i["eco"])}" data-vendor="{escape(i["vendor"])}" data-date="{i["date"]}">'
                    f'{tech_title(i)}<div class="tags"><span>{i["date"]}</span>{badges(i)}</div></li>' for i in its)
     uniq = lambda k: sorted({i[k] for i in its if i[k]}, key=str.lower)
+    ecos, vendors = uniq("eco"), uniq("vendor")
     form = ('<form id="f" role="search"><label>Recherche<input type="search" name="q" placeholder="CVE, produit, mot-clé…"></label>'
             '<label>Catégorie<select name="cat"><option value="">Toutes</option><option value="cloud">Cloud</option><option value="autre">Hors cloud</option></select></label>'
-            + select("sev", "Sévérité", uniq("sev")) + select("eco", "Écosystème", uniq("eco")) + select("vendor", "Éditeur", uniq("vendor")) +
+            + select("sev", "Sévérité", uniq("sev")) + select("eco", "Écosystème", ecos) + select("vendor", "Éditeur", vendors) +
             '<label>Période<select name="days"><option value="">Tout</option><option value="7">7 jours</option><option value="30">30 jours</option><option value="365">1 an</option></select></label>'
             '<label class="chk"><input type="checkbox" name="ransom" value="1">Rançongiciel</label>'
             '<button type="button" id="rst">Réinitialiser</button></form>')
     dash_body = dashboard(its, today)
-    list_body = f'<h1>Toutes les failles</h1>{form}<p id="n" aria-live="polite"></p><ul id="l">{rows}</ul><button id="more" type="button" hidden></button>{SCRIPT}'
+    list_body = f'<h1>Toutes les failles</h1>{form}{tech_picker(ecos, vendors)}<p id="n" aria-live="polite"></p><ul id="l">{rows}</ul><button id="more" type="button" hidden></button>{SCRIPT}'
     (OUT / "index.html").write_text(PAGE.format(title="TechNews", root="", nav_dash=' aria-current="page"', nav_list="", icons=icon_sprite(dash_body), body=dash_body))
     (OUT / "liste.html").write_text(PAGE.format(title="Toutes les failles · TechNews", root="", nav_dash="", nav_list=' aria-current="page"', icons=icon_sprite(list_body), body=list_body))
 

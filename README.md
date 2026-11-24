@@ -9,7 +9,7 @@ Le site rassemble au même endroit les failles publiées par deux sources gratui
 ## Utiliser le site
 
 - `index.html` (tableau de bord) : affiche les compteurs des 7 derniers jours, cliquables pour filtrer la liste, ainsi que les 5 failles les plus importantes du mois.
-- `liste.html` (toutes les failles) : permet de rechercher par CVE, produit ou mot-clé, et de filtrer par catégorie (cloud ou hors cloud), sévérité, écosystème, éditeur, période ou usage par des rançongiciels.
+- `liste.html` (toutes les failles) : permet de rechercher par CVE, produit ou mot-clé, de filtrer par catégorie (cloud ou hors cloud), sévérité, écosystème, éditeur, période ou usage par des rançongiciels, et de cocher ses technos préférées (mémorisées dans un cookie).
 - Fiches détaillées : chaque faille renvoie vers une page locale avec sa description, l'action requise pour les entrées CISA KEV et un lien vers la source officielle.
 
 ## Générer en local
