@@ -322,6 +322,7 @@ def render(its, today=None):
     list_body = f'<h1>Toutes les failles</h1>{form}{tech_picker(ecos, vendors)}<p id="n" aria-live="polite"></p><ul id="l">{rows}</ul><button id="more" type="button" hidden></button>{SCRIPT}'
     (OUT / "index.html").write_text(PAGE.format(title="TechNews", root="", nav_dash=' aria-current="page"', nav_list="", icons=icon_sprite(dash_body), body=dash_body))
     (OUT / "liste.html").write_text(PAGE.format(title="Toutes les failles · TechNews", root="", nav_dash="", nav_list=' aria-current="page"', icons=icon_sprite(list_body), body=list_body))
+    (OUT / "failles.json").write_text(json.dumps({"generated_at": today.isoformat(), "count": len(its), "items": its}, ensure_ascii=False))
 
 if __name__ == "__main__":
     render(items(get(KEV), get(GHSA)))

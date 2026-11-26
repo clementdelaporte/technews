@@ -59,4 +59,10 @@ assert 'id="techs"' in idx and 'id="tq"' in idx and 'id="tclr"' in idx and 'id="
 assert 'value="e:npm"' in idx and 'value="v:VMware"' in idx and 'technews_techs' in idx and 'SameSite=Lax' in idx
 assert build.tech_picker([], []) == ""
 assert 'value="v:A &amp; &lt;B&gt;"' in build.tech_picker([], ["A & <B>"])
+import json
+catalogue = json.loads((build.OUT / "failles.json").read_text())
+assert catalogue["generated_at"] == "2026-01-05" and catalogue["count"] == len(its) == len(catalogue["items"])
+by_id = {x["id"]: x for x in catalogue["items"]}
+assert by_id["CVE-1"]["product"] == "ESXi" and by_id["CVE-1"]["cwes"] == ["CWE-78"]
+assert by_id["GHSA-a"]["cve_id"] == "CVE-2026-9999" and by_id["GHSA-a"]["cwes"] == ["CWE-79"] and by_id["GHSA-a"]["packages"][0]["first_patched_version"] == "1.2.0"
 print("ok")
