@@ -35,21 +35,36 @@ def items(kev, ghsa):
         vendor, prod = v["vendorProject"], v["product"]
         tech_raw = prod if vendor.lower() in prod.lower() else f"{vendor} {prod}".strip()
         tech, summary = _split_tech(tech_raw, v["vulnerabilityName"])
-        out.append(dict(id=v["cveID"], date=v["dateAdded"], tech=tech, summary=summary, title=f"{tech} : {summary}",
+        out.append(dict(id=v["cveID"], cve_id=v["cveID"], date=v["dateAdded"], tech=tech, summary=summary, title=f"{tech} : {summary}",
             body=f'{v["shortDescription"]}\n\nAction requise : {v["requiredAction"]}\n\nUtilisée par des rançongiciels : {v["knownRansomwareCampaignUse"]}',
             source="CISA KEV (domaine public)", url=f'https://nvd.nist.gov/vuln/detail/{v["cveID"]}', cloud=kev_cloud(v), sev="exploitée",
-            ransom=v["knownRansomwareCampaignUse"] == "Known", eco="", vendor=vendor, product=prod, cwes=list(v.get("cwes") or [])))
+            ransom=v["knownRansomwareCampaignUse"] == "Known", eco="", vendor=vendor, product=prod,
+            cwes=list(v.get("cwes") or []), packages=[]))
     for a in ghsa:
-        pkgs = [p["package"] for p in a.get("vulnerabilities") or [] if p.get("package")]
+        pkgs = []
+        for p in a.get("vulnerabilities") or []:
+            pkg = p.get("package")
+            if not pkg:
+                continue
+            fpv = p.get("first_patched_version")
+            if isinstance(fpv, dict):
+                fpv = fpv.get("identifier")
+            pkgs.append({
+                "ecosystem": pkg.get("ecosystem") or "",
+                "name": pkg.get("name") or "",
+                "vulnerable_version_range": p.get("vulnerable_version_range") or "",
+                "first_patched_version": fpv or "",
+            })
         eco = pkgs[0]["ecosystem"] if pkgs else ""
         tech_raw = (pkgs[0]["name"] if pkgs else eco) or "GitHub"
         tech, summary = _split_tech(tech_raw, a["summary"])
-        out.append(dict(id=a["ghsa_id"], date=a["published_at"][:10], tech=tech, summary=summary,
+        cwes = [c["cwe_id"] if isinstance(c, dict) else c for c in (a.get("cwes") or []) if (c.get("cwe_id") if isinstance(c, dict) else c)]
+        out.append(dict(id=a["ghsa_id"], cve_id=a.get("cve_id") or "", date=a["published_at"][:10], tech=tech, summary=summary,
             title=f"{tech} : {summary}" if tech != summary else tech,
             body=(a.get("description") or "")[:3000], source="GitHub Advisory Database (CC-BY 4.0)",
             url=a.get("html_url") or f'https://github.com/advisories/{a["ghsa_id"]}',
             cloud=any(pkg_cloud(p["name"]) for p in pkgs), sev=a["severity"], ransom=False,
-            eco=eco, vendor=""))
+            eco=eco, vendor="", product="", cwes=cwes, packages=pkgs))
     return sorted(out, key=lambda i: i["date"], reverse=True)
 
 PAGE = """<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">

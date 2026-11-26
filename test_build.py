@@ -5,11 +5,22 @@ def kev(id, vendor, product, ransom="Unknown", cwes=None):
     d = {"cveID": id, "vendorProject": vendor, "product": product, "vulnerabilityName": "<b>bad</b>", "dateAdded": "2026-01-02",
          "shortDescription": "flaws everywhere", "requiredAction": BOD, "knownRansomwareCampaignUse": ransom}
     return d if cwes is None else {**d, "cwes": cwes}
-def gh(id, pkg, eco="go"):
-    return {"ghsa_id": id, "summary": "aws flaws", "severity": "high", "published_at": "2026-01-03T00:00:00Z", "description": None,
-            "vulnerabilities": [{"package": {"ecosystem": eco, "name": pkg}}]}
+def gh(id, pkg, eco="go", cve_id=None, rng=None, patched=None, cwes=None):
+    vuln = {"package": {"ecosystem": eco, "name": pkg}}
+    if rng is not None:
+        vuln["vulnerable_version_range"] = rng
+    if patched is not None:
+        vuln["first_patched_version"] = patched
+    d = {"ghsa_id": id, "summary": "aws flaws", "severity": "high", "published_at": "2026-01-03T00:00:00Z", "description": None,
+         "vulnerabilities": [vuln]}
+    if cve_id is not None:
+        d["cve_id"] = cve_id
+    if cwes is not None:
+        d["cwes"] = cwes
+    return d
 k = {"vulnerabilities": [kev("CVE-1", "VMware", "ESXi", "Known", ["CWE-78"]), kev("CVE-2", "Microsoft", "Windows"), kev("CVE-3", "Ivanti", "Cloud Services Appliance"), kev("CVE-4", "Apple", "iCloud for Windows")]}
-g = [gh("GHSA-a", "github.com/aws/aws-sdk-go"), gh("GHSA-b", "github.com/kubeshark/kubeshark"), gh("GHSA-c", "next", "npm"), gh("GHSA-d", "nextcloud/server", "composer")]
+g = [gh("GHSA-a", "github.com/aws/aws-sdk-go", cve_id="CVE-2026-9999", rng="< 1.2.0", patched="1.2.0", cwes=[{"cwe_id": "CWE-79"}]),
+     gh("GHSA-b", "github.com/kubeshark/kubeshark"), gh("GHSA-c", "next", "npm"), gh("GHSA-d", "nextcloud/server", "composer")]
 its = {i["id"]: i for i in build.items(k, g)}
 cloud = {i for i, v in its.items() if v["cloud"]}
 # phrase BOD, "flaws"/"aws" dans le texte et "iCloud"/"nextcloud" ne doivent pas classer en cloud
@@ -18,6 +29,9 @@ assert its["CVE-1"]["ransom"] and not its["CVE-2"]["ransom"] and its["CVE-1"]["s
 assert its["GHSA-c"]["eco"] == "npm" and its["CVE-2"]["vendor"] == "Microsoft"
 assert its["CVE-1"]["product"] == "ESXi" and its["CVE-1"]["cwes"] == ["CWE-78"]
 assert its["CVE-2"]["product"] == "Windows" and its["CVE-2"]["cwes"] == []
+assert its["GHSA-a"]["cve_id"] == "CVE-2026-9999" and its["GHSA-a"]["cwes"] == ["CWE-79"]
+assert its["GHSA-a"]["packages"] == [{"ecosystem": "go", "name": "github.com/aws/aws-sdk-go", "vulnerable_version_range": "< 1.2.0", "first_patched_version": "1.2.0"}]
+assert its["GHSA-c"]["cve_id"] == "" and its["GHSA-c"]["packages"][0]["vulnerable_version_range"] == ""
 assert build.items({"vulnerabilities": []}, [dict(gh("GHSA-z", "x"), vulnerabilities=None)])[0]["eco"] == ""
 from datetime import date
 build.render(list(its.values()), today=date(2026, 1, 5))
