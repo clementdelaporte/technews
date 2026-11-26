@@ -38,7 +38,7 @@ def items(kev, ghsa):
         out.append(dict(id=v["cveID"], date=v["dateAdded"], tech=tech, summary=summary, title=f"{tech} : {summary}",
             body=f'{v["shortDescription"]}\n\nAction requise : {v["requiredAction"]}\n\nUtilisée par des rançongiciels : {v["knownRansomwareCampaignUse"]}',
             source="CISA KEV (domaine public)", url=f'https://nvd.nist.gov/vuln/detail/{v["cveID"]}', cloud=kev_cloud(v), sev="exploitée",
-            ransom=v["knownRansomwareCampaignUse"] == "Known", eco="", vendor=vendor))
+            ransom=v["knownRansomwareCampaignUse"] == "Known", eco="", vendor=vendor, product=prod, cwes=list(v.get("cwes") or [])))
     for a in ghsa:
         pkgs = [p["package"] for p in a.get("vulnerabilities") or [] if p.get("package")]
         eco = pkgs[0]["ecosystem"] if pkgs else ""
